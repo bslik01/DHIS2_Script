@@ -16,6 +16,18 @@
 
 ---
 
+## 📝 Changements récents
+
+Voici les modifications apportées récemment au dépôt (à prendre en compte lors de l'utilisation) :
+
+- Ajout de `/.env.example` : modèle commenté contenant des placeholders pour toutes les variables de configuration. Copier ce fichier en `.env` et remplir localement (ne pas committer).
+- Ajout de `/.gitignore` : ignore désormais `.env`, `output/`, `data/*.csv` et autres fichiers temporaires/IDE.
+- Intégration des étapes de téléchargement directement dans `pivot_tracked_and_stage.py` : la logique de `download_tracked.py` et `download.py` a été fusionnée pour permettre au script de récupérer automatiquement les CSV si nécessaire.
+- Nouvelles options CLI pour contrôler le téléchargement : `--no-download`, `--download-only`, et `--force-download`.
+- Ajout de vérifications préalables et messages d'erreur plus clairs pour les cas où les fichiers d'entrée sont manquants (évite les `FileNotFoundError` non expliquées).
+- Mise à jour de la documentation et masquage des tokens sensibles dans le README ; recommandations de sécurité ajoutées (révoquer les tokens exposés, utiliser `.env.example`).
+
+
 ## 🎯 Description du script
 
 **`pivot_tracked_and_stage.py`** est un script Python qui transforme des données DHIS2 (système de gestion d'informations sanitaires) en un fichier Excel bien structuré.
@@ -314,33 +326,48 @@ Cette méthode utilise toutes les configurations du fichier `.env`.
    python3 pivot_tracked_and_stage.py
    ```
 
-### Méthode 2 : Utilisation avec options personnalisées (avancé)
 
-Vous pouvez surcharger les paramètres du `.env` directement en ligne de commande :
+### Méthode 2 : Configuration avancée et flags de contrôle
+
+Ce script est configuré principalement via le fichier `.env` (ou variables d'environnement). Il n'expose pas d'arguments CLI pour chaque option DHIS2 — utilisez `.env` ou préfixez la commande avec des variables d'environnement si besoin.
+
+Contrôle du pipeline via flags (CLI)
+
+- `--skip-download` : saute la phase de téléchargement et utilise les fichiers locaux (attendus aux chemins indiqués dans `.env`).
+- `--only-download` : lance uniquement la phase de téléchargement (tracked + events) puis quitte.
+- `--only-pivot` : saute la phase de téléchargement et exécute uniquement le pivot + génération Excel.
+
+Exemples :
 
 ```bash
-python pivot_tracked_and_stage.py \
-  --tracked-input mon_fichier_tracked.csv \
-  --stage-input mon_fichier_stages.csv \
-  --output resultat_personnalise.xlsx \
-  --base-url https://mon-serveur-dhis2.com/api/29 \
-  --token mon_token_secret \
-  --program UID_PROGRAMME
+# Exécution complète (téléchargement si configuré puis pivot)
+python3 pivot_tracked_and_stage.py
+
+# Télécharger seulement (utile pour récupérer CSV sans générer l'Excel)
+python3 pivot_tracked_and_stage.py --only-download
+
+# Utiliser uniquement des fichiers locaux (ne pas télécharger)
+python3 pivot_tracked_and_stage.py --skip-download
+
+# Ne faire que le pivot (utile si vous avez déjà les CSV)
+python3 pivot_tracked_and_stage.py --only-pivot
 ```
 
-#### Options disponibles :
+Exemple : définir une variable d'environnement temporairement et lancer le téléchargement
 
-| Option | Description | Exemple |
-|--------|-------------|---------|
-| `--tracked-input` | Fichier CSV des entités suivies | `trackedEntityInstances.csv` |
-| `--stage-input` | Fichier CSV des événements | `data.csv` |
-| `--output` | Nom du fichier Excel de sortie | `resultat.xlsx` |
-| `--base-url` | URL de l'API DHIS2 | `https://dhis2.example.com/api/29` |
-| `--token` | Token d'authentification DHIS2 | `d2pat_xxxxx` |
-| `--program` | UID du programme | `LlrP8fstjfM` |
-| `--aggfunc` | Fonction d'agrégation | `first`, `last`, `sum`, `mean` |
-| `--strict` | Mode strict (colonnes essentielles uniquement) | `--strict` |
-| `--debug-stages` | Afficher les détails des stages | `--debug-stages` |
+```bash
+TRACKED_BASE_URL=https://dhis2.example.org/hmis-events/api/trackedEntityInstances.csv \
+PIVOT_TOKEN=d2pat_XXXXX \
+python3 pivot_tracked_and_stage.py --only-download
+```
+
+Variables `.env` lues par le script (principales)
+
+- Tracked (download_tracked) : `TRACKED_BASE_URL`, `TRACKED_PROGRAM`, `TRACKED_PROGRAM_START_DATE`, `TRACKED_PROGRAM_END_DATE`, `TRACKED_OU_MODE`, `TRACKED_FORMAT`, `TRACKED_OUTPUT`
+- Events (download) : `DOWNLOAD_BASE_URL`, `DOWNLOAD_ORG_UNIT`, `DOWNLOAD_PROGRAM`, `DOWNLOAD_START_DATE`, `DOWNLOAD_END_DATE`, `DOWNLOAD_OU_MODE`, `DOWNLOAD_SKIP_PAGING`, `DOWNLOAD_FORMAT`, `PIVOT_INPUT`
+- Pivot / général : `PIVOT_BASE_URL`, `PIVOT_TOKEN` (utilisé pour les requêtes API et les téléchargements), `MERGED_PIVOT_OUTPUT`, `PIVOT_AGGFUNC`, `PIVOT_MAPPING_FILE`, `PIVOT_STATE_FILE`
+
+Remarque : le token utilisé dans le script est `PIVOT_TOKEN` (il est réutilisé pour les deux téléchargements et pour les appels API). Utilisez `.env.example` comme modèle pour remplir ces valeurs localement.
 
 ### Mode strict (colonnes essentielles seulement)
 
