@@ -320,18 +320,24 @@ def run_pivot_and_excel(
                 print(f"⏩ Déjà traité : {stage_name}")
                 continue
 
+
             print(f"▶️ Traitement : {stage_name}")
 
-            elements = get_stage_dataelements(base_url, token, stage["id"])
-            cols = ["enrollment", "ID"] + [c for c in elements if c in pivot.columns]
-            sheet_df = pivot[cols]
+            # Récupère la liste ordonnée des dataElements pour ce stage (displayName)
+            elements = get_stage_dataelements(base_url, token, stage["id"])  # list[str]
 
-            if sheet_df.columns.tolist() == ["enrollment", "ID"]:
-                print("⚠️ Stage vide ignoré")
-                state["completed_stages"].append(stage_name)
-                save_state(state_file, state)
-                continue
+            # Construire les colonnes du sheet dans l'ordre exact donné par le ProgramStage
+            cols = ["enrollment", "ID"] + elements
 
+            # Reindexer le pivot global pour garantir que toutes les colonnes présentes dans
+            # la définition du stage sont écrites, dans l'ordre demandé. Les colonnes
+            # manquantes (pas présentes dans les events) seront créées et remplies vides.
+            # Cela évite d'omettre un ProgramStage simplement parce que toutes ses valeurs
+            # seraient vides : la feuille contiendra alors les colonnes (vides) correspondantes.
+            sheet_df = pivot.reindex(columns=cols, fill_value="").copy()
+            sheet_df = sheet_df.fillna("")
+
+            # Écrire la feuille (même si toutes les colonnes de dataElement sont vides)
             sheet_df.to_excel(writer, sheet_name=stage_name, index=False)
             auto_adjust_column_width(writer.sheets[stage_name])
 
